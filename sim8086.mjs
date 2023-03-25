@@ -4,12 +4,11 @@ const [, , input_path] = process.argv;
 
 const buffer = readFileSync(input_path);
 
-const op_map = {
-    "100010": "mod",
-};
-
 const mod_map = {
-    "11": "regreg",
+    "00": "mem, 0 disp",
+    "01": "mem, 8 disp",
+    "10": "mem, 16 disp",
+    "11": "reg",
 };
 
 // Top level key is w bit.
@@ -36,41 +35,57 @@ const reg_map = {
     },
 };
 
-let byte1;
-let op,
-    d, // "dest", 1 = reg is dest, 0 = reg is source.
+let d, // "dest", 1 = reg is dest, 0 = reg is source.
     w, // "wide"
     mod, // reg2reg, reg2mem, mem2mem, mem2reg, etc.
     reg, // reg address
-    rm; // reg/mem address
+    rm, // reg/mem address
+    data;
 
 for (let i = 0; i < buffer.length; i++) {
-    byte1 = !byte1;
+    let byte = buffer.readUInt8(i);
+    let bits = byte.toString(2);
 
-    const byte = buffer.readUInt8(i);
-    const bits = byte.toString(2);
-
-    if (byte1) {
-        op = bits.slice(0, 6);
+    // register/memory to/from register
+    if (bits.slice(0, 6) === "100010") {
         d = bits[6];
         w = bits[7];
-
-        continue;
-    } else {
+        i++;
+        byte = buffer.readUInt8(i);
+        bits = byte.toString(2);
         mod = bits.slice(0, 2); // TODO: currently unused. all we do is reg to reg right now.
         reg = bits.slice(2, 5);
         rm = bits.slice(5, 8);
+
+        let dest_asm = reg_map[w][reg];
+        let source_asm = reg_map[w][rm];
+
+        if (d === '0') {
+            const dest_tmp = dest_asm;
+            dest_asm = source_asm;
+            source_asm = dest_tmp;
+        }
+
+        console.log(`mov ${dest_asm}, ${source_asm}`);
+        continue;
     }
 
-    const op_asm = op_map[op];
-    let dest_asm = reg_map[w][reg];
-    let source_asm = reg_map[w][rm];
+    // immediate to register
+    if (bits.slice(0, 4) === "1011") {
+        w = bits[4];
+        reg = bits.slice(5, 8);
+        i++;
 
-    if (d === '0') {
-        const dest_tmp = dest_asm;
-        dest_asm = source_asm;
-        source_asm = dest_tmp;
+        if (w === "1") {
+            data = buffer.readUInt16LE(i)
+            i++;
+        } else {
+            data = buffer.readUInt8(i);
+        }
+
+        let dest_asm = reg_map[w][reg];
+
+        console.log(`mov ${dest_asm}, ${data}`)
+        continue;
     }
-
-    console.log(`${op_asm} ${dest_asm}, ${source_asm}`)
 }
