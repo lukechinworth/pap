@@ -4,13 +4,6 @@ const [, , input_path] = process.argv;
 
 const buffer = readFileSync(input_path);
 
-const mod_map = {
-    "00": "mem, 0 disp",
-    "01": "mem, 8 disp",
-    "10": "mem, 16 disp",
-    "11": "reg",
-};
-
 // Top level key is w bit.
 const reg_map = {
     "0": {
@@ -35,8 +28,19 @@ const reg_map = {
     },
 };
 
-let d, // "dest", 1 = reg is dest, 0 = reg is source.
-    w, // "wide"
+const rm_map = {
+    "000": "bx + si",
+    "001": "bx + di",
+    "010": "bp + si",
+    "011": "bp + di",
+    "100": "si",
+    "101": "di",
+    "110": "bp", // except when mod = 00, then 16bit disp follows.
+    "111": "bx",
+};
+
+let d, // "direction", 1 = reg is dest, 0 = reg is source.
+    w, // "word", i.e. 16bit
     mod, // reg2reg, reg2mem, mem2mem, mem2reg, etc.
     reg, // reg address
     rm, // reg/mem address
@@ -44,7 +48,7 @@ let d, // "dest", 1 = reg is dest, 0 = reg is source.
 
 for (let i = 0; i < buffer.length; i++) {
     let byte = buffer.readUInt8(i);
-    let bits = byte.toString(2);
+    let bits = byte.toString(2).padStart(8, "0");
 
     // register/memory to/from register
     if (bits.slice(0, 6) === "100010") {
@@ -52,22 +56,46 @@ for (let i = 0; i < buffer.length; i++) {
         w = bits[7];
         i++;
         byte = buffer.readUInt8(i);
-        bits = byte.toString(2);
-        mod = bits.slice(0, 2); // TODO: currently unused. all we do is reg to reg right now.
+        bits = byte.toString(2).padStart(8, "0");
+        mod = bits.slice(0, 2);
         reg = bits.slice(2, 5);
         rm = bits.slice(5, 8);
 
-        let dest_asm = reg_map[w][reg];
-        let source_asm = reg_map[w][rm];
+        const reg_address = reg_map[w][reg];
 
-        if (d === '0') {
-            const dest_tmp = dest_asm;
-            dest_asm = source_asm;
-            source_asm = dest_tmp;
+        switch (mod) {
+            // memory mode, no displacement
+            case "00":
+                console.log(rm)
+                // TODO: displacement exception for rm = 110
+                const mem_address = `[${rm_map[rm]}]`;
+                if (d === "1") {
+                    console.log(`mov ${reg_address}, ${mem_address}`);
+                } else {
+                    // TODO: last test in listing 39 not printing.
+                    console.log(`mov ${mem_address}, ${reg_address}`);
+                }
+                continue;
+                break;
+            // memory mode, 8bit displacement
+            case "01":
+                // TODO: handle this.
+                break;
+            // memory mode, 16bit displacement
+            case "10":
+                // TODO: handle this.
+                break;
+            // register mode
+            case "11":
+                const rm_reg_address = reg_map[w][rm];
+                if (d === "1") {
+                    console.log(`mov ${reg_address}, ${rm_reg_address}`);
+                } else {
+                    console.log(`mov ${rm_reg_address}, ${reg_address}`);
+                }
+                continue;
+                break;
         }
-
-        console.log(`mov ${dest_asm}, ${source_asm}`);
-        continue;
     }
 
     // immediate to register
@@ -83,9 +111,9 @@ for (let i = 0; i < buffer.length; i++) {
             data = buffer.readUInt8(i);
         }
 
-        let dest_asm = reg_map[w][reg];
+        const reg_address = reg_map[w][reg];
 
-        console.log(`mov ${dest_asm}, ${data}`)
+        console.log(`mov ${reg_address}, ${data}`)
         continue;
     }
 }
