@@ -46,6 +46,8 @@ let d, // "direction", 1 = reg is dest, 0 = reg is source.
     rm, // reg/mem address
     data;
 
+console.log("bits 16");
+
 for (let i = 0; i < buffer.length; i++) {
     let byte = buffer.readUInt8(i);
     let bits = byte.toString(2).padStart(8, "0");
@@ -64,27 +66,6 @@ for (let i = 0; i < buffer.length; i++) {
         const reg_address = reg_map[w][reg];
 
         switch (mod) {
-            // memory mode, no displacement
-            case "00":
-                console.log(rm)
-                // TODO: displacement exception for rm = 110
-                const mem_address = `[${rm_map[rm]}]`;
-                if (d === "1") {
-                    console.log(`mov ${reg_address}, ${mem_address}`);
-                } else {
-                    // TODO: last test in listing 39 not printing.
-                    console.log(`mov ${mem_address}, ${reg_address}`);
-                }
-                continue;
-                break;
-            // memory mode, 8bit displacement
-            case "01":
-                // TODO: handle this.
-                break;
-            // memory mode, 16bit displacement
-            case "10":
-                // TODO: handle this.
-                break;
             // register mode
             case "11":
                 const rm_reg_address = reg_map[w][rm];
@@ -92,6 +73,30 @@ for (let i = 0; i < buffer.length; i++) {
                     console.log(`mov ${reg_address}, ${rm_reg_address}`);
                 } else {
                     console.log(`mov ${rm_reg_address}, ${reg_address}`);
+                }
+                continue;
+                break;
+            // memory mode
+            default:
+                // TODO: displacement exception for mod = 00 and rm = 110
+                let mem_address = rm_map[rm];
+
+                if (mod === "01") { // 8bit displacement
+                    i++;
+                    data = buffer.readUInt8(i);
+                    mem_address += ` + ${data}`;
+                } else if (mod === "10") {// 16bit displacement
+                    i++;
+                    data = buffer.readUInt16LE(i);
+                    i++;
+                    mem_address += ` + ${data}`;
+                }
+
+                if (d === "1") {
+                    console.log(`mov ${reg_address}, [${mem_address}]`);
+                } else {
+                    // TODO: last test in listing 39 not printing.
+                    console.log(`mov [${mem_address}], ${reg_address}`);
                 }
                 continue;
                 break;
