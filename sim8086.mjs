@@ -69,13 +69,16 @@ for (let i = 0; i < buffer.length; i++) {
     let op_code = bits.slice(0, 6);
     let op = rm_op_map[op_code];
 
-    // register/memory and register
+    console.log(i, bits);
+
+    // mov/add/sub/cmp register/memory, register/memory
     if (op) {
         d = bits[6];
         w = bits[7];
         i++;
         byte = buffer.readUInt8(i);
         bits = byte.toString(2).padStart(8, "0");
+        console.log(i, bits);
         mod = bits.slice(0, 2);
         reg = bits.slice(2, 5);
         rm = bits.slice(5, 8);
@@ -86,6 +89,7 @@ for (let i = 0; i < buffer.length; i++) {
             // register mode
             case "11":
                 const rm_reg_address = reg_map[w][rm];
+
                 if (d === "1") {
                     console.log(`${op} ${reg_address}, ${rm_reg_address}`);
                 } else {
@@ -119,13 +123,14 @@ for (let i = 0; i < buffer.length; i++) {
         }
     }
 
-    // immedidate and register/memory
+    // add/sub/cmp register/memory, immediate
     if (op_code === "100000") {
-        s = bits[6]; // TODO: unused for now.
+        s = bits[6];
         w = bits[7];
         i++;
         byte = buffer.readUInt8(i);
         bits = byte.toString(2).padStart(8, "0");
+        console.log(i, bits);
         mod = bits.slice(0, 2);
         op_code = bits.slice(2, 5);
         op = immediate_op_map[op_code];
@@ -136,9 +141,14 @@ for (let i = 0; i < buffer.length; i++) {
             case "11":
                 const reg_address = reg_map[w][rm];
                 if (w === "1") {
-                    i++;
-                    data = buffer.readInt16LE(i)
-                    i++;
+                    if (s === "1") {
+                        i++;
+                        data = buffer.readInt8(i);
+                    } else {
+                        i++;
+                        data = buffer.readInt16LE(i)
+                        i++;
+                    }
                 } else {
                     i++;
                     data = buffer.readUInt8(i);
@@ -164,9 +174,14 @@ for (let i = 0; i < buffer.length; i++) {
                 }
 
                 if (w === "1") {
-                    i++;
-                    data = buffer.readInt16LE(i)
-                    i++;
+                    if (s === "1") {
+                        i++;
+                        data = buffer.readInt8(i);
+                    } else {
+                        i++;
+                        data = buffer.readInt16LE(i)
+                        i++;
+                    }
                 } else {
                     i++;
                     data = buffer.readUInt8(i);
@@ -178,7 +193,7 @@ for (let i = 0; i < buffer.length; i++) {
         }
     }
 
-    // immediate to register
+    // mov register, immediate
     if (bits.slice(0, 4) === "1011") {
         w = bits[4];
         reg = bits.slice(5, 8);
